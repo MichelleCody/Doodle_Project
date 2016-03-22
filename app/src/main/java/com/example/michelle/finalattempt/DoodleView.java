@@ -6,6 +6,8 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
+import android.graphics.RectF;
+import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
@@ -14,6 +16,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.widget.Button;
 import android.view.View.OnClickListener;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -24,9 +27,12 @@ public class DoodleView extends View {
 
     private Paint _paintDoodle = new Paint();
     private Path _path = new Path();
+    private int alpha = 10;
     private boolean erase=false;
     ArrayList<Paint> _paintList = new ArrayList<Paint>();
     ArrayList<Path> _pathList = new ArrayList<Path>();
+    ArrayList<Paint> _undonePaint = new ArrayList<Paint>();
+    ArrayList<Path> _undonePath = new ArrayList<Path>();
 
     public DoodleView(Context context) {
         super(context);
@@ -47,12 +53,16 @@ public class DoodleView extends View {
         _paintDoodle.setColor(Color.BLACK);
         _paintDoodle.setAntiAlias(true);
         _paintDoodle.setStyle(Paint.Style.STROKE);
+        _paintDoodle.setStrokeWidth(10);
+        _paintDoodle.setAlpha(alpha);
         _paintDoodle.setStrokeJoin(Paint.Join.ROUND);
         _paintDoodle.setStrokeCap(Paint.Cap.ROUND);
     }
 
-    public void changeColorRed() {
-        _paintDoodle.setColor(Color.RED);
+    public void changeColor(int color) {
+        _paintDoodle.setColor(color);
+        _paintDoodle.setAlpha(alpha);
+        //_paintDoodle.setColor(Color.parseColor(color));
     }
 
     public void clear() {
@@ -61,16 +71,45 @@ public class DoodleView extends View {
         invalidate();
     }
 
-    /*public void setErase(boolean isErase){
-        erase=isErase;
-        if(erase) {
-            drawPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.CLEAR));
+    public void undo() {
+        //get last path and paint and store both
+        if (!_pathList.isEmpty()) {
+            Path lastPath = _pathList.get(_pathList.size() - 1);
+            _undonePath.add(lastPath);
+            Paint lastPaint = _paintList.get(_paintList.size() - 1);
+            _undonePaint.add(lastPaint);
+//          Toast toast = Toast.makeText(getContext(), lastPath.toString() + " " + lastPaint.toString(), Toast.LENGTH_SHORT);
+//          toast.show();
+            //remove the last one now
+            _pathList.remove(_pathList.size() - 1);
+            _paintList.remove(_paintList.size() - 1);
+            invalidate();
         }
-        else {
-            drawPaint.setXfermode(null);
-        }
-    }*/
+    }
 
+    public void changeBrushStroke(int size) {
+        _paintDoodle.setStrokeWidth(size);
+    }
+
+    public void changeOpacity(int size) {
+        alpha = (int) (size * 2.55);
+        _paintDoodle.setAlpha(alpha);
+    }
+
+    public void redo() {
+        //TODO: put a check to see if there are NO undos!!
+        if (!_undonePaint.isEmpty()) {
+            //get added paths and paints
+            Path addPath = _undonePath.get(_undonePath.size() - 1);
+            Paint addPaint = _undonePaint.get(_undonePaint.size() - 1);
+            _pathList.add(addPath);
+            _paintList.add(addPaint);
+
+            _undonePath.remove(_undonePath.size() - 1);
+            _undonePaint.remove(_undonePaint.size() - 1);
+            invalidate();
+        }
+    }
 
     @Override
     public void onDraw(Canvas canvas) {
@@ -79,6 +118,7 @@ public class DoodleView extends View {
         for(i = 0; i < _pathList.size(); i++) {
             canvas.drawPath(_pathList.get(i), _paintList.get(i));
         }
+        canvas.drawPath(_path, _paintDoodle);
     }
 
     @Override
@@ -94,17 +134,29 @@ public class DoodleView extends View {
                 _path.lineTo(touchX, touchY);
                 break;
             case MotionEvent.ACTION_UP:
-                //canvas.drawPath(_path, _paintDoodle);
-                //_path.reset();
+
+                RectF dot = new RectF();
+                _path.computeBounds(dot, false);
+
+                if(dot.isEmpty()) {
+                    makeDot(touchX,touchY);
+                }
+
                 _pathList.add(_path);
                 Paint p = new Paint();
                 p.set(_paintDoodle);
                 _paintList.add(p);
+                _path = new Path();
                 break;
         }
 
         invalidate();
         return true;
+    }
+
+    private void makeDot(float x, float y) {
+        _path.moveTo(x,y);
+        _path.lineTo(x+1,y+1);
     }
 
 
